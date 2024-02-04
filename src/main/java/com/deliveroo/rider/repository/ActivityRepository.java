@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 
+import javax.xml.crypto.Data;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,4 +31,7 @@ public interface ActivityRepository extends CrudRepository<Activity, Long> {
 
     @Query(value = "SELECT * FROM activity WHERE YEAR(date) = :year and MONTH(date) = :month",nativeQuery = true)
     List<Activity> findByDateInYearAndMonth(@Param("year") int year, @Param("month") int month);
+
+    @Query(value = "SELECT * FROM activity WHERE date BETWEEN :from AND :to", nativeQuery = true)
+    List<Activity> findDataInDateRange(@Param("from") Date from,@Param("to") Date to);
 }

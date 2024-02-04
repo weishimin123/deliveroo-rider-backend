@@ -12,6 +12,7 @@ import com.deliveroo.rider.pojo.dto.*;
 import com.deliveroo.rider.repository.ActivityRepository;
 import com.deliveroo.rider.repository.FeeBoostRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -38,13 +39,13 @@ public class ActivityController {
     private static volatile List<FeeBoost> feeBoostList;
 
     @GetMapping("/activities/{startYear}/{startMonth}/months/{months}")
-    public ResponseEntity<List<MonthlyActivitySummary>> monthlyActivities(@PathVariable("startYear")int year, @PathVariable("startMonth") Month startMonth, @PathVariable("months") int length ){
+    public ResponseEntity<List<MonthlyActivitySummary>> monthlyActivities(@PathVariable("startYear") int year, @PathVariable("startMonth") Month startMonth, @PathVariable("months") int length) {
         List<MonthlyActivitySummary> list = new ArrayList<>();
-        for(int i=0; i<length; i++) {
+        for (int i = 0; i < length; i++) {
             Month[] months = Month.values();
-            int index = startMonth.ordinal()-i;
-            if(index < 0) {
-                if(index == -1){
+            int index = startMonth.ordinal() - i;
+            if (index < 0) {
+                if (index == -1) {
                     year--;
                 }
                 index = 12 + index;
@@ -53,36 +54,27 @@ public class ActivityController {
             List<Activity> monthlyActivities = repository.findByDateInYearAndMonth(year, month.ordinal() + 1);
             int orders = calculateTotalOrders(monthlyActivities);
             double earnings = calculateTotalEarnings(monthlyActivities);
-            list.add(new MonthlyActivitySummary(month.getAbbreviation(),orders,earnings));
+            list.add(new MonthlyActivitySummary(month.getAbbreviation(), orders, earnings));
         }
         return ResponseEntity.ok().body(list);
     }
 
     @GetMapping("/activities/{year}/{month}")
     public ResponseEntity<MonthlyActivity> monthlyActivity(@PathVariable("year") int year
-            , @PathVariable("month") Month month){
+            , @PathVariable("month") Month month) {
         List<Activity> monthlyActivities = repository.findByDateInYearAndMonth(year, month.ordinal() + 1);
         double monthlyEarnings = calculateTotalEarnings(monthlyActivities);
         int monthlyOrders = calculateTotalOrders(monthlyActivities);
         int activityDays = calculateActivityDays(monthlyActivities);
-        List<DailyActivitySummary> dailyActivities = new ArrayList<>();
-        for(Activity activity : monthlyActivities){
-            int dailyOrders = calculateTotalOrders(activity);
-            double dailyEarnings = calculateTotalEarnings(activity);
-            Long id = activity.getId();
-            DailyActivitySummary dailyActivity = new DailyActivitySummary(dailyOrders,
-                    dailyEarnings,
-                    activity.getDate(),id);
-            dailyActivities.add(dailyActivity);
-        }
-        MonthlyActivity monthlyActivity = new MonthlyActivity(month.getAbbreviation(), monthlyOrders,monthlyEarnings,activityDays,dailyActivities);
+        List<DailyActivitySummary> dailyActivities = mapToDailyActivitySummary(monthlyActivities);
+        MonthlyActivity monthlyActivity = new MonthlyActivity(month.getAbbreviation(), monthlyOrders, monthlyEarnings, activityDays, dailyActivities);
         return ResponseEntity.ok().body(monthlyActivity);
     }
 
     @GetMapping("/activity/{id}")
-    public ResponseEntity<DailyActivity> dailyActivity(@PathVariable("id") Long id){
+    public ResponseEntity<DailyActivity> dailyActivity(@PathVariable("id") Long id) {
         Optional<Activity> optional = repository.findById(id);
-        if(optional.isPresent()) {
+        if (optional.isPresent()) {
             Activity activity = optional.get();
             int dailyOrders = calculateTotalOrders(activity);
             double dailyEarnings = calculateTotalEarnings(activity);
@@ -90,14 +82,14 @@ public class ActivityController {
             double tips = calculateTotalTips(activity);
             double extras = calculateTotalExtraFees(activity);
             List<OrderSummary> orderSummaries = new ArrayList<>();
-            for(Order order: activity.getOrders()) {
+            for (Order order : activity.getOrders()) {
                 double earnings = calculateTotalEarnings(order);
                 LocalTime completeTime = calculateCompleteTime(order);
                 int subOrders = calculateSubOrders(order);
-                OrderSummary orderSummary = new OrderSummary(order.getShop(),completeTime,earnings,subOrders,order.getId());
+                OrderSummary orderSummary = new OrderSummary(order.getShop(), completeTime, earnings, subOrders, order.getId());
                 orderSummaries.add(orderSummary);
             }
-            DailyActivity dailyActivity = new DailyActivity(activity.getDate(),fees,extras,tips,orderSummaries);
+            DailyActivity dailyActivity = new DailyActivity(activity.getDate(), fees, extras, tips, orderSummaries);
             dailyActivity.setOrders(dailyOrders);
             dailyActivity.setId(activity.getId());
             dailyActivity.setDailyEarnings(dailyEarnings);
@@ -105,6 +97,49 @@ public class ActivityController {
         } else {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/activities/from/{fromDate}/to/{toDate}")
+    public ResponseEntity<WeeklyActivity> dayActivities(
+            @PathVariable("fromDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date from,
+            @PathVariable("toDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date to) {
+        List<Activity> activities = repository.findDataInDateRange(from, to);
+
+        int orders = calculateTotalOrders(activities);
+        double weeklyEarnings = calculateTotalEarnings(activities);
+        int activityDays = calculateActivityDays(activities);
+        List<DailyActivitySummary> dayActivities = mapToDailyActivitySummary(activities);
+
+        WeeklyActivity weeklyActivity = new WeeklyActivity();
+        weeklyActivity.setActivityDays(activityDays);
+        weeklyActivity.setWeeklyEarnings(weeklyEarnings);
+        weeklyActivity.setOrders(orders);
+        weeklyActivity.setStart(from);
+        weeklyActivity.setComplete(to);
+        weeklyActivity.setDailyActivities(dayActivities);
+
+        return ResponseEntity.ok().body(weeklyActivity);
+    }
+
+    @GetMapping("/activities/{date}/weeks/{weeks}")
+    public ResponseEntity<List<WeeklyActivitySummary>> weeklyActivities(
+            @PathVariable("date") @DateTimeFormat(pattern = "yyyy-MM-dd") Date date,
+            @PathVariable("weeks") int length) {
+        List<DateRange> dateRanges = calculateDateRanges(date, length);
+
+        List<WeeklyActivitySummary> weeklyActivities = new ArrayList<>();
+        for (DateRange range : dateRanges) {
+            Date end = range.getEnd();
+            Date start = range.getStart();
+            List<Activity> activities = repository.findDataInDateRange(start, end);
+            int orders = calculateTotalOrders(activities);
+            double weeklyEarnings = calculateTotalEarnings(activities);
+            WeeklyActivitySummary weeklyActivitySummary = new WeeklyActivitySummary(orders, weeklyEarnings);
+            weeklyActivitySummary.setStart(start);
+            weeklyActivitySummary.setComplete(end);
+            weeklyActivities.add(weeklyActivitySummary);
+        }
+        return ResponseEntity.ok().body(weeklyActivities);
     }
 
     @PutMapping("/activity")
@@ -194,15 +229,15 @@ public class ActivityController {
         Activity activity = new Activity();
         activity.setDate(calendar.getTime());
         DayOfWeek dayOfWeek = mapToDayOfWeek(calendar);
-            switch (workingType) {
-                case BUSY:
-                    activity.setOrders(randomOrders(15, dayOfWeek));
-                case NORMAL:
-                    activity.setOrders(randomOrders(10, dayOfWeek));
-                case EASY:
-                    activity.setOrders(randomOrders(5, dayOfWeek));
+        switch (workingType) {
+            case BUSY:
+                activity.setOrders(randomOrders(15, dayOfWeek));
+            case NORMAL:
+                activity.setOrders(randomOrders(10, dayOfWeek));
+            case EASY:
+                activity.setOrders(randomOrders(5, dayOfWeek));
 
-            }
+        }
 
         return activity;
     }
@@ -219,33 +254,33 @@ public class ActivityController {
         Order order = new Order();
         order.setFee(randomFee(dayOfWeek));
         order.setOrderDetails(randomOrderDetails());
-        order.setTip(randomTip(1,5));
+        order.setTip(randomTip(1, 5));
         order.setShop(randomShop());
         order.setPlace(randomPlace());
-        order.setExtra(randomExtra(dayOfWeek,order));
+        order.setExtra(randomExtra(dayOfWeek, order));
         return order;
     }
 
     private Double randomExtra(DayOfWeek dayOfWeek, Order order) {
-        if(feeBoostList == null){
+        if (feeBoostList == null) {
             searchFeeBoostList();
         }
         Optional<FeeBoost> optional = feeBoostList.stream()
                 .filter(item -> item.getDayOfWeek() == dayOfWeek)
                 .findFirst();
-        if(optional.isPresent()){
+        if (optional.isPresent()) {
             FeeBoost feeBoost = optional.get();
-            if(ifInExtraPeriod(feeBoost, order.getOrderDetails())){
+            if (ifInExtraPeriod(feeBoost, order.getOrderDetails())) {
                 BigDecimal result = BigDecimal.valueOf(order.getFee())
                         .multiply(BigDecimal.valueOf(feeBoost.getRate() - 1));
-                return  formatDouble(result.doubleValue());
+                return formatDouble(result.doubleValue());
             }
         }
         return 0.0;
     }
 
-    private boolean ifInExtraPeriod(FeeBoost feeBoost,List<OrderDetail> orderDetails){
-        return orderDetails.stream().anyMatch(ele->
+    private boolean ifInExtraPeriod(FeeBoost feeBoost, List<OrderDetail> orderDetails) {
+        return orderDetails.stream().anyMatch(ele ->
                 ele.getStart().isAfter(feeBoost.getStart()) &&
                         ele.getComplete().isBefore(feeBoost.getComplete()));
     }
@@ -253,20 +288,20 @@ public class ActivityController {
     private Double randomFee(DayOfWeek dayOfWeek) {
         double random;
         if (dayOfWeek == DayOfWeek.FRIDAY || dayOfWeek == DayOfWeek.SATURDAY) {
-            random =  2.9 + (Math.random() * (14 - 2.9));
+            random = 2.9 + (Math.random() * (14 - 2.9));
         } else {
-            random =  2.9 + (Math.random() * (9 - 2.9));
+            random = 2.9 + (Math.random() * (9 - 2.9));
         }
         return formatDouble(random);
     }
 
-    private Double formatDouble(Double value){
+    private Double formatDouble(Double value) {
         DecimalFormat df = new DecimalFormat("#.##");
         return Double.parseDouble(df.format(value));
     }
 
-    private Double randomTip(int min, int max){
-        if( Math.random() > 0.87){
+    private Double randomTip(int min, int max) {
+        if (Math.random() > 0.87) {
             Random random = new Random();
             return formatDouble(min + (max - min) * random.nextDouble());
         }
@@ -275,13 +310,13 @@ public class ActivityController {
 
     private String randomShop() {
         List<String> shops = customProperties.getShops();
-        int index = new Random().nextInt(shops.size() );
+        int index = new Random().nextInt(shops.size());
         return shops.get(index);
     }
 
     private String randomPlace() {
         List<String> places = customProperties.getPlaces();
-        int index = new Random().nextInt(places.size() );
+        int index = new Random().nextInt(places.size());
         return places.get(index);
     }
 
@@ -330,8 +365,8 @@ public class ActivityController {
             hour++;
             minute -= 60;
         }
-        if(hour>23){
-            hour-=24;
+        if (hour > 23) {
+            hour -= 24;
         }
         return LocalTime.of(hour, minute);
     }
@@ -355,10 +390,10 @@ public class ActivityController {
         return random.nextInt((max - min) + 1) + min;
     }
 
-    private void searchFeeBoostList(){
-        if(feeBoostList == null){
-            synchronized (ActivityController.class){
-                if(feeBoostList == null){
+    private void searchFeeBoostList() {
+        if (feeBoostList == null) {
+            synchronized (ActivityController.class) {
+                if (feeBoostList == null) {
                     Iterable<FeeBoost> feeBoosts = feeBoostRepository.findAll();
                     feeBoostList = new ArrayList<>();
                     for (FeeBoost next : feeBoosts) {
@@ -368,6 +403,7 @@ public class ActivityController {
             }
         }
     }
+
     private double calculateTotalEarnings(List<Activity> activities) {
         double earnings = activities.stream()
                 .flatMap(monthly -> monthly.getOrders().stream())
@@ -398,13 +434,13 @@ public class ActivityController {
         return formatDouble(earnings);
     }
 
-    private LocalTime calculateCompleteTime(Order order){
+    private LocalTime calculateCompleteTime(Order order) {
         Optional<OrderDetail> max = order.getOrderDetails().stream()
                 .max(Comparator.comparing(OrderDetail::getComplete));
         return max.map(OrderDetail::getComplete).orElse(null);
     }
 
-    private int calculateSubOrders(Order order){
+    private int calculateSubOrders(Order order) {
         return order.getOrderDetails().size();
     }
 
@@ -439,12 +475,46 @@ public class ActivityController {
                 .sum();
     }
 
-    private int calculateTotalOrders(Activity activity){
+    private int calculateTotalOrders(Activity activity) {
         return activity.getOrders().size();
     }
 
-    private int calculateActivityDays(List<Activity> monthlyActivities){
-        return monthlyActivities.size();
+    private int calculateActivityDays(List<Activity> activities) {
+        return activities.size();
     }
 
+    private List<DateRange> calculateDateRanges(Date origin, int length) {
+        List<DateRange> dateRanges = new ArrayList<>();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(origin);
+        calendar.setFirstDayOfWeek(Calendar.MONDAY);
+
+        for (int i = 0; i < length; i++) {
+            DateRange dateRange = new DateRange();
+            if (i == 0) {
+                calendar.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
+            } else {
+                calendar.add(Calendar.DAY_OF_WEEK, -1);
+            }
+            dateRange.setEnd(calendar.getTime());
+            calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+            dateRange.setStart(calendar.getTime());
+            dateRanges.add(dateRange);
+        }
+        return dateRanges;
+    }
+
+    private List<DailyActivitySummary> mapToDailyActivitySummary(List<Activity> activities) {
+        List<DailyActivitySummary> dailyActivitySummaries = new ArrayList<>();
+        for (Activity activity : activities) {
+            int dailyOrders = calculateTotalOrders(activity);
+            double dailyEarnings = calculateTotalEarnings(activity);
+            Long id = activity.getId();
+            DailyActivitySummary dailyActivity = new DailyActivitySummary(dailyOrders,
+                    dailyEarnings,
+                    activity.getDate(), id);
+            dailyActivitySummaries.add(dailyActivity);
+        }
+        return dailyActivitySummaries;
+    }
 }

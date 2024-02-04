@@ -3,11 +3,9 @@ package com.deliveroo.rider.entity;
 import com.deliveroo.rider.pojo.*;
 import lombok.*;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
+import javax.persistence.*;
 import java.io.Serializable;
+import java.util.List;
 
 @Entity
 @Data
@@ -16,13 +14,13 @@ public class Account implements Serializable {
     @GeneratedValue
     private Long id;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 30,unique = true)
     private String phone;
 
     @Column(nullable = false, length = 5)
     private CallingCode callingCode;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 30,unique = true)
     private String email;
 
     @Column(nullable = false,length = 10)
@@ -40,6 +38,10 @@ public class Account implements Serializable {
     @Column(length = 10)
     private WorkingType workingType;
 
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 10,unique = true)
     private String riderId;
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "account_id")
+    private List<Activity> activities;
 }
