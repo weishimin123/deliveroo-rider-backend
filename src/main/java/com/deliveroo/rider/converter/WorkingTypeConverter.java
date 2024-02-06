@@ -1,4 +1,4 @@
-package com.deliveroo.rider.component.converter;
+package com.deliveroo.rider.converter;
 
 import com.deliveroo.rider.pojo.WorkingType;
 import org.springframework.core.convert.converter.Converter;

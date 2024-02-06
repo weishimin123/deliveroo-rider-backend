@@ -4,9 +4,13 @@ public enum Country {
     IRELAND("Ireland"),
     UK("United Kingdom");
 
-    private String name;
+    private String countryName;
 
-    Country(String name){
-        this.name = name;
+    Country(String countryName) {
+        this.countryName = countryName;
+    }
+
+    public String getCountryName() {
+        return this.countryName;
     }
 }

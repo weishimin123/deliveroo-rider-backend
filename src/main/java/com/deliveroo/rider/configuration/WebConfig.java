@@ -1,8 +1,8 @@
 package com.deliveroo.rider.configuration;
 
-import com.deliveroo.rider.component.converter.DayOfWeekConverter;
-import com.deliveroo.rider.component.converter.MonthConverter;
-import com.deliveroo.rider.component.converter.WorkingTypeConverter;
+import com.deliveroo.rider.converter.DayOfWeekConverter;
+import com.deliveroo.rider.converter.MonthConverter;
+import com.deliveroo.rider.converter.WorkingTypeConverter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;

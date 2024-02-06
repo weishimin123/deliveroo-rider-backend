@@ -1,4 +1,4 @@
-package com.deliveroo.rider.configuration;
+package com.deliveroo.rider.serialization.serializer;
 
 import com.deliveroo.rider.entity.FeeBoost;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -18,7 +18,6 @@ public class FeeBoostSerializer extends JsonSerializer<FeeBoost> {
         jsonGenerator.writeStringField("timeRange", String.format("%s-%s",
                 feeBoost.getStart().format(formatter),
                 feeBoost.getComplete().format(formatter)));
-//        jsonGenerator.writeStringField("day",feeBoost.getDayOfWeek().toString());
         jsonGenerator.writeStringField("detail",feeBoost.getRate()+"x extra per order");
         jsonGenerator.writeEndObject();
     }

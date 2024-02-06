@@ -1,5 +1,6 @@
 package com.deliveroo.rider.configuration;
 
+import com.deliveroo.rider.serialization.serializer.FeeBoostSerializer;
 import com.deliveroo.rider.entity.FeeBoost;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
