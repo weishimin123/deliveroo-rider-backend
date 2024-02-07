@@ -19,6 +19,7 @@ public class JwtUtil {
     public static Map<String, String> TOKEN_MAP = new HashMap<>();
 
     public static String generateToken(Account account) {
+        System.out.println("weishimin123");
         String riderId = account.getRiderId();
         if (TOKEN_MAP.containsKey(riderId)) {
             return TOKEN_MAP.get(riderId);
